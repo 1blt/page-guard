@@ -63,6 +63,10 @@ inputs:
     description: 'Inject incorrect-but-readable decoy content for scrapers'
     required: false
     default: 'true'
+  generate-summary:
+    description: 'Generate GitHub Actions step summary'
+    required: false
+    default: 'true'
 
 outputs:
   images-processed:
@@ -113,4 +117,5 @@ runs:
           ${{ inputs.minify == 'true' && '--minify' || '' }} \
           ${{ inputs.strip-metadata == 'true' && '--strip-metadata' || '' }} \
           ${{ inputs.anti-scrape == 'true' && '--anti-scrape' || '' }} \
-          ${{ inputs.poison-data == 'true' && '--poison-data' || '' }}
+          ${{ inputs.poison-data == 'true' && '--poison-data' || '' }} \
+          ${{ inputs.generate-summary == 'false' && '--no-summary' || '' }}

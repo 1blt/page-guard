@@ -45,6 +45,9 @@ def main():
     parser.add_argument('--anti-scrape', action='store_true', help='Enable anti-scraping')
     parser.add_argument('--poison-data', action='store_true', help='Inject decoy content')
 
+    # Output
+    parser.add_argument('--no-summary', action='store_true', help='Disable GitHub Actions summary')
+
     args = parser.parse_args()
 
     excludes = [e.strip() for e in args.exclude.split(',')]
@@ -70,9 +73,19 @@ def main():
     print(f"Page Guard - Processing {base_path}")
     print("=" * 50)
 
-    # 1. Image Protection
+    # 1. Metadata Stripping (first - clean images before protection)
+    if args.strip_metadata:
+        print("\n[1/4] Metadata Stripping")
+        stripper = MetadataStripper()
+        count = stripper.process_directory(base_path, output_path, excludes)
+        stats['metadata_stripped'] = count
+        print(f"  Stripped metadata from {count} files")
+    else:
+        print("\n[1/4] Metadata Stripping: Skipped")
+
+    # 2. Image Protection (after metadata stripped, so perturbations persist)
     if args.protect_images:
-        print("\n[1/4] Image Protection")
+        print("\n[2/4] Image Protection")
         config_map = {
             'subtle': ProtectionConfig.subtle,
             'balanced': ProtectionConfig.balanced,
@@ -91,29 +104,19 @@ def main():
         else:
             print("  No images found")
     else:
-        print("\n[1/4] Image Protection: Skipped")
+        print("\n[2/4] Image Protection: Skipped")
 
-    # 2. Obfuscation
+    # 3. Obfuscation (minify HTML/CSS/JS)
     if args.obfuscate or args.minify:
-        print("\n[2/4] Obfuscation")
+        print("\n[3/4] Obfuscation")
         obfuscator = Obfuscator(minify=args.minify, obfuscate=args.obfuscate)
         count = obfuscator.process_directory(base_path, output_path, excludes)
         stats['files_obfuscated'] = count
         print(f"  Processed {count} files")
     else:
-        print("\n[2/4] Obfuscation: Skipped")
+        print("\n[3/4] Obfuscation: Skipped")
 
-    # 3. Metadata Stripping
-    if args.strip_metadata:
-        print("\n[3/4] Metadata Stripping")
-        stripper = MetadataStripper()
-        count = stripper.process_directory(base_path, output_path, excludes)
-        stats['metadata_stripped'] = count
-        print(f"  Stripped metadata from {count} files")
-    else:
-        print("\n[3/4] Metadata Stripping: Skipped")
-
-    # 4. Anti-Scraping
+    # 4. Anti-Scraping (last - inject decoys into final HTML)
     if args.anti_scrape or args.poison_data:
         print("\n[4/4] Anti-Scraping")
         scraper = AntiScraper(honeypots=args.anti_scrape, poison=args.poison_data)
@@ -141,7 +144,7 @@ def main():
 
     # Generate summary (GitHub Actions or console)
     github_summary = os.environ.get('GITHUB_STEP_SUMMARY')
-    if github_summary:
+    if github_summary and not args.no_summary:
         with open(github_summary, 'a') as f:
             f.write("## Page Guard Summary\n\n")
             f.write("| Protection | Status | Count |\n")

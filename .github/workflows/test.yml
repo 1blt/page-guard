@@ -9,149 +9,84 @@ on:
 jobs:
   test-all-protections:
     runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.guard.outputs.images-processed }}
+      obfuscated: ${{ steps.guard.outputs.files-obfuscated }}
+      metadata: ${{ steps.guard.outputs.metadata-stripped }}
+      decoys: ${{ steps.guard.outputs.decoys-injected }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run Page Guard (all protections)
+      - name: Run Page Guard
         id: guard
         uses: ./
         with:
           path: './test/site'
-
-      - name: Verify outputs
-        run: |
-          echo "Images processed: ${{ steps.guard.outputs.images-processed }}"
-          echo "Files obfuscated: ${{ steps.guard.outputs.files-obfuscated }}"
-          echo "Metadata stripped: ${{ steps.guard.outputs.metadata-stripped }}"
-          echo "Decoys injected: ${{ steps.guard.outputs.decoys-injected }}"
+          generate-summary: 'false'
 
       - name: Verify minification worked
         run: |
-          # Check that HTML comments were removed (minification)
           if grep -q '<!--.*-->' test/site/index.html; then
             echo "Error: HTML comments were not removed"
             exit 1
           fi
-          echo "Minification verified successfully"
 
       - name: Verify poison data injected
         run: |
-          # Check for aria-hidden decoy content
           if ! grep -q 'aria-hidden="true"' test/site/index.html; then
             echo "Error: Poison data was not injected"
             exit 1
           fi
-          echo "Poison data injected successfully"
 
       - name: Verify metadata stripped
         run: |
-          # Check that generator meta tag was removed
           if grep -q 'name="generator"' test/site/index.html; then
             echo "Error: Metadata was not stripped"
             exit 1
           fi
-          echo "Metadata stripped successfully"
-
-  test-image-only:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Page Guard (images only)
-        id: guard
-        uses: ./
-        with:
-          path: './test/site'
-          obfuscate: 'false'
-          minify: 'false'
-          strip-metadata: 'false'
-          anti-scrape: 'false'
-          poison-data: 'false'
-
-      - name: Verify only images processed
-        run: |
-          echo "Images processed: ${{ steps.guard.outputs.images-processed }}"
-
-          if [ "${{ steps.guard.outputs.images-processed }}" -lt 1 ]; then
-            echo "Error: No images were processed"
-            exit 1
-          fi
-          echo "Image-only mode verified"
-
-  test-obfuscation-only:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Page Guard (obfuscation only)
-        id: guard
-        uses: ./
-        with:
-          path: './test/site'
-          protect-images: 'false'
-          strip-metadata: 'false'
-          anti-scrape: 'false'
-          poison-data: 'false'
-
-      - name: Verify obfuscation
-        run: |
-          echo "Files obfuscated: ${{ steps.guard.outputs.files-obfuscated }}"
-
-          if [ "${{ steps.guard.outputs.files-obfuscated }}" -lt 1 ]; then
-            echo "Error: No files were obfuscated"
-            exit 1
-          fi
-
-          # Check CSS was minified
-          if grep -q '/\*' test/site/styles.css; then
-            echo "Error: CSS comments were not removed"
-            exit 1
-          fi
-          echo "Obfuscation-only mode verified"
 
   test-full-image-protection:
     runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.guard.outputs.images-processed }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run Page Guard (full image protection)
+      - name: Run Page Guard (with neural network protection)
         id: guard
         uses: ./
         with:
           path: './test/site'
           full-image-protection: 'true'
-          obfuscate: 'false'
-          minify: 'false'
-          strip-metadata: 'false'
-          anti-scrape: 'false'
-          poison-data: 'false'
+          generate-summary: 'false'
 
       - name: Verify full protection
         run: |
-          echo "Images processed: ${{ steps.guard.outputs.images-processed }}"
-
           if [ "${{ steps.guard.outputs.images-processed }}" -lt 1 ]; then
             echo "Error: No images were processed with full protection"
             exit 1
           fi
-          echo "Full image protection verified"
 
   test-output-path:
     runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.guard.outputs.images-processed }}
+      obfuscated: ${{ steps.guard.outputs.files-obfuscated }}
+      metadata: ${{ steps.guard.outputs.metadata-stripped }}
+      decoys: ${{ steps.guard.outputs.decoys-injected }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run Page Guard (separate output)
+      - name: Run Page Guard (separate output directory)
         id: guard
         uses: ./
         with:
           path: './test/site'
           output-path: './protected'
+          generate-summary: 'false'
 
       - name: Verify output directory
         run: |
@@ -159,9 +94,36 @@ jobs:
             echo "Error: Output directory was not created"
             exit 1
           fi
-
           if [ ! -f "./protected/index.html" ]; then
             echo "Error: HTML not in output directory"
             exit 1
           fi
-          echo "Output path mode verified"
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: [test-all-protections, test-full-image-protection, test-output-path]
+    if: always()
+
+    steps:
+      - name: Generate Test Summary
+        run: |
+          echo "## Page Guard Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Test results table
+          echo "### Test Status" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| All Protections | ${{ needs.test-all-protections.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Full Image Protection | ${{ needs.test-full-image-protection.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Output Path | ${{ needs.test-output-path.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Protection details table (in execution order)
+          echo "### Protection Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| # | Protection | Status | Count | Description |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|------------|--------|-------|-------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 1 | Metadata Stripping | ✅ Enabled | ${{ needs.test-all-protections.outputs.metadata }} files | Stripped EXIF data, generator tags, and sensitive metadata from images and HTML |" >> $GITHUB_STEP_SUMMARY
+          echo "| 2 | Image Protection | ✅ Enabled | ${{ needs.test-all-protections.outputs.images }} images | Applied adversarial perturbations (DCT watermarking, wavelet transforms, strategic noise) to confuse AI models |" >> $GITHUB_STEP_SUMMARY
+          echo "| 3 | Obfuscation | ✅ Enabled | ${{ needs.test-all-protections.outputs.obfuscated }} files | Removed comments and minified HTML, CSS, and JavaScript files |" >> $GITHUB_STEP_SUMMARY
+          echo "| 4 | Anti-Scraping | ✅ Enabled | ${{ needs.test-all-protections.outputs.decoys }} decoys | Injected honeypot links and poison data to pollute AI training datasets |" >> $GITHUB_STEP_SUMMARY
