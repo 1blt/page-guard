@@ -26,14 +26,14 @@ jobs:
           echo "Metadata stripped: ${{ steps.guard.outputs.metadata-stripped }}"
           echo "Decoys injected: ${{ steps.guard.outputs.decoys-injected }}"
 
-      - name: Verify obfuscation worked
+      - name: Verify minification worked
         run: |
-          # Check that class names were obfuscated
-          if grep -q 'class="hero-section"' test/site/index.html; then
-            echo "Error: Class names were not obfuscated"
+          # Check that HTML comments were removed (minification)
+          if grep -q '<!--.*-->' test/site/index.html; then
+            echo "Error: HTML comments were not removed"
             exit 1
           fi
-          echo "Class names obfuscated successfully"
+          echo "Minification verified successfully"
 
       - name: Verify poison data injected
         run: |
@@ -76,12 +76,6 @@ jobs:
 
           if [ "${{ steps.guard.outputs.images-processed }}" -lt 1 ]; then
             echo "Error: No images were processed"
-            exit 1
-          fi
-
-          # Classes should NOT be obfuscated
-          if ! grep -q 'class="hero-section"' test/site/index.html; then
-            echo "Error: Classes were unexpectedly obfuscated"
             exit 1
           fi
           echo "Image-only mode verified"

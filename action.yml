@@ -40,11 +40,11 @@ inputs:
 
   # Obfuscation
   obfuscate:
-    description: 'Enable HTML/CSS/JS obfuscation'
+    description: 'Remove comments from HTML/CSS/JS (safe, preserves functionality)'
     required: false
     default: 'true'
   minify:
-    description: 'Minify HTML/CSS/JS'
+    description: 'Minify HTML/CSS/JS by removing whitespace (safe, preserves functionality)'
     required: false
     default: 'true'
 

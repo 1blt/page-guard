@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
 """
-Obfuscation module - Obfuscate and minify HTML, CSS, and JavaScript.
+Obfuscation module - Safe minification for HTML, CSS, and JavaScript.
+
+This module performs only safe transformations that maintain functional equivalence:
+- Comment removal
+- Whitespace minification
+- Safe formatting changes
+
+It does NOT perform class/ID renaming as this breaks modern frameworks
+(lit-html, React, Vue) that use dynamic class bindings.
 """
 
 import re
-import random
-import string
 from pathlib import Path
 from typing import Optional
 
 from bs4 import BeautifulSoup, Comment
-import cssutils
 import logging
 
 # Suppress cssutils warnings
+import cssutils
 cssutils.log.setLevel(logging.CRITICAL)
 
 # Optional imports
@@ -31,13 +37,29 @@ except ImportError:
 
 
 class Obfuscator:
-    """Obfuscate and minify web files."""
+    """Safe minification for web files.
+
+    Performs only transformations that preserve functional equivalence:
+    - HTML: Comment removal, whitespace minification
+    - CSS: Comment removal, whitespace minification
+    - JS: Comment removal, whitespace minification
+
+    Class and ID names are NOT modified as this breaks:
+    - lit-html classMap() directive
+    - React className bindings
+    - Vue :class bindings
+    - Any framework using dynamic class composition
+    """
 
     def __init__(self, minify: bool = True, obfuscate: bool = True):
+        """Initialize the obfuscator.
+
+        Args:
+            minify: Enable whitespace minification
+            obfuscate: Enable comment removal (class/ID renaming is disabled for safety)
+        """
         self.minify = minify
         self.obfuscate = obfuscate
-        self._class_map = {}
-        self._id_map = {}
 
     def process_directory(self, base_path: Path, output_path: Optional[Path], excludes: list[str]) -> int:
         """Process all HTML, CSS, and JS files in directory."""
@@ -77,14 +99,8 @@ class Obfuscator:
             return output_path / file_path.name
         return file_path
 
-    def _generate_obfuscated_name(self, original: str, prefix: str = '') -> str:
-        """Generate a short obfuscated name."""
-        chars = string.ascii_lowercase
-        length = 4 + len(original) % 3
-        return prefix + ''.join(random.choices(chars, k=length))
-
     def _process_html(self, file_path: Path, output_path: Optional[Path]) -> bool:
-        """Process an HTML file."""
+        """Process an HTML file with safe transformations only."""
         try:
             content = file_path.read_text(encoding='utf-8')
             soup = BeautifulSoup(content, 'lxml')
@@ -94,28 +110,6 @@ class Obfuscator:
                 for comment in soup.find_all(string=lambda t: isinstance(t, Comment)):
                     if not comment.strip().startswith('[if'):
                         comment.extract()
-
-                # Obfuscate class names (map them consistently)
-                for tag in soup.find_all(class_=True):
-                    new_classes = []
-                    for cls in tag.get('class', []):
-                        if cls not in self._class_map:
-                            self._class_map[cls] = self._generate_obfuscated_name(cls, 'c')
-                        new_classes.append(self._class_map[cls])
-                    tag['class'] = new_classes
-
-                # Obfuscate IDs
-                for tag in soup.find_all(id=True):
-                    old_id = tag['id']
-                    if old_id not in self._id_map:
-                        self._id_map[old_id] = self._generate_obfuscated_name(old_id, 'i')
-                    tag['id'] = self._id_map[old_id]
-
-                # Update href="#id" references
-                for tag in soup.find_all(href=re.compile(r'^#')):
-                    old_ref = tag['href'][1:]
-                    if old_ref in self._id_map:
-                        tag['href'] = '#' + self._id_map[old_ref]
 
             result = str(soup)
 
@@ -138,24 +132,16 @@ class Obfuscator:
             return False
 
     def _process_css(self, file_path: Path, output_path: Optional[Path]) -> bool:
-        """Process a CSS file."""
+        """Process a CSS file with safe transformations only."""
         try:
             content = file_path.read_text(encoding='utf-8')
 
             if self.obfuscate:
-                # Replace class names that we've mapped
-                for old_cls, new_cls in self._class_map.items():
-                    content = re.sub(rf'\.{re.escape(old_cls)}(?=\s|{{|,|:|\[|\.)', f'.{new_cls}', content)
-
-                # Replace IDs
-                for old_id, new_id in self._id_map.items():
-                    content = re.sub(rf'#{re.escape(old_id)}(?=\s|{{|,|:|\[)', f'#{new_id}', content)
-
-                # Remove CSS comments
+                # Remove CSS comments only - do not rename classes/IDs
                 content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
 
             if self.minify:
-                # Simple CSS minification
+                # Safe CSS minification - only whitespace changes
                 content = re.sub(r'\s+', ' ', content)
                 content = re.sub(r'\s*([{};:,>+~])\s*', r'\1', content)
                 content = content.strip()
@@ -171,25 +157,12 @@ class Obfuscator:
             return False
 
     def _process_js(self, file_path: Path, output_path: Optional[Path]) -> bool:
-        """Process a JavaScript file."""
+        """Process a JavaScript file with safe transformations only."""
         try:
             content = file_path.read_text(encoding='utf-8')
 
-            if self.obfuscate:
-                # Update class references in JS (querySelector, classList, etc.)
-                for old_cls, new_cls in self._class_map.items():
-                    content = re.sub(rf"'\.{re.escape(old_cls)}'", f"'.{new_cls}'", content)
-                    content = re.sub(rf'"\\.{re.escape(old_cls)}"', f'".{new_cls}"', content)
-                    content = re.sub(rf"'{re.escape(old_cls)}'", f"'{new_cls}'", content)
-                    content = re.sub(rf'"{re.escape(old_cls)}"', f'"{new_cls}"', content)
-
-                # Update ID references
-                for old_id, new_id in self._id_map.items():
-                    content = re.sub(rf"'#{re.escape(old_id)}'", f"'#{new_id}'", content)
-                    content = re.sub(rf'"#{re.escape(old_id)}"', f'"#{new_id}"', content)
-                    content = re.sub(rf"getElementById\s*\(\s*'{re.escape(old_id)}'\s*\)", f"getElementById('{new_id}')", content)
-                    content = re.sub(rf'getElementById\s*\(\s*"{re.escape(old_id)}"\s*\)', f'getElementById("{new_id}")', content)
-
+            # jsmin handles comment removal and safe minification
+            # It does NOT rename variables or modify string contents
             if self.minify and JSMIN_AVAILABLE:
                 content = jsmin(content)
 
