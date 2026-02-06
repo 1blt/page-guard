@@ -109,31 +109,11 @@ jobs:
         run: |
           echo "## Page Guard Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Protection summary table (in execution order)
           echo "| # | Protection | Status | Count | Description |" >> $GITHUB_STEP_SUMMARY
           echo "|---|------------|--------|-------|-------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 1 | Metadata Stripping | ${{ needs.test-all-protections.result == 'success' && '**Enabled**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.metadata }} files | Stripped EXIF data, generator tags, and sensitive metadata from images and HTML |" >> $GITHUB_STEP_SUMMARY
-          echo "| 2 | Image Protection | ${{ needs.test-all-protections.result == 'success' && '**Enabled**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.images }} images | Applied adversarial perturbations (DCT watermarking, wavelet transforms, strategic noise) |" >> $GITHUB_STEP_SUMMARY
-          echo "| 3 | Obfuscation | ${{ needs.test-all-protections.result == 'success' && '**Enabled**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.obfuscated }} files | Removed comments and minified HTML, CSS, and JavaScript files |" >> $GITHUB_STEP_SUMMARY
-          echo "| 4 | Anti-Scraping | ${{ needs.test-all-protections.result == 'success' && '**Enabled**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.decoys }} decoys | Injected honeypot links and poison data to pollute AI training datasets |" >> $GITHUB_STEP_SUMMARY
-          echo "| - | Full Neural Network | ${{ needs.test-full-image-protection.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-full-image-protection.outputs.images }} images | Adversarial perturbations using ResNet50 model |" >> $GITHUB_STEP_SUMMARY
-          echo "| - | Output Directory | ${{ needs.test-output-path.result == 'success' && '**Pass**' || 'Failed' }} | - | Writes protected files to separate output directory |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Details section
-          echo "<details>" >> $GITHUB_STEP_SUMMARY
-          echo "<summary>Execution Details</summary>" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Execution Order" >> $GITHUB_STEP_SUMMARY
-          echo "1. **Metadata Stripping** - Runs first to clean EXIF/metadata from images before protection" >> $GITHUB_STEP_SUMMARY
-          echo "2. **Image Protection** - Applies adversarial perturbations to already-clean images" >> $GITHUB_STEP_SUMMARY
-          echo "3. **Obfuscation** - Minifies and removes comments from HTML/CSS/JS" >> $GITHUB_STEP_SUMMARY
-          echo "4. **Anti-Scraping** - Injects decoys last so they remain in final output" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Test Configurations" >> $GITHUB_STEP_SUMMARY
-          echo "- **All Protections**: In-place modification with all 4 protections enabled" >> $GITHUB_STEP_SUMMARY
-          echo "- **Full Neural Network**: Enables PyTorch-based adversarial perturbations (ResNet50)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Output Directory**: Tests writing to separate \`./protected\` directory" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "| 1 | Metadata Stripping | ${{ needs.test-all-protections.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.metadata }} files | Stripped EXIF data, generator tags, and sensitive metadata |" >> $GITHUB_STEP_SUMMARY
+          echo "| 2 | Image Protection | ${{ needs.test-all-protections.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.images }} images | Applied adversarial perturbations (DCT, wavelet, strategic noise) |" >> $GITHUB_STEP_SUMMARY
+          echo "| 3 | Obfuscation | ${{ needs.test-all-protections.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.obfuscated }} files | Removed comments and minified HTML, CSS, and JavaScript |" >> $GITHUB_STEP_SUMMARY
+          echo "| 4 | Anti-Scraping | ${{ needs.test-all-protections.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.decoys }} decoys | Injected honeypot links and poison data |" >> $GITHUB_STEP_SUMMARY
+          echo "| 5 | Neural Network | ${{ needs.test-full-image-protection.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-full-image-protection.outputs.images }} images | ResNet50-based adversarial perturbations |" >> $GITHUB_STEP_SUMMARY
+          echo "| 6 | Output Directory | ${{ needs.test-output-path.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-output-path.outputs.images }} files | Protected files written to separate directory |" >> $GITHUB_STEP_SUMMARY
