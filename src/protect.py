@@ -272,7 +272,8 @@ def process_image(
     img_path: Path,
     output_path: Optional[Path],
     protector: ImageProtector,
-    preserve_original: bool
+    preserve_original: bool,
+    base_path: Optional[Path] = None
 ) -> bool:
     """Process a single image. Returns True on success."""
     try:
@@ -293,8 +294,13 @@ def process_image(
 
         # Determine output location
         if output_path:
-            out_file = output_path / img_path.name
-            output_path.mkdir(parents=True, exist_ok=True)
+            # Preserve directory structure relative to base_path
+            if base_path:
+                relative = img_path.relative_to(base_path)
+            else:
+                relative = Path(img_path.name)
+            out_file = output_path / relative
+            out_file.parent.mkdir(parents=True, exist_ok=True)
         else:
             out_file = img_path
             if preserve_original:

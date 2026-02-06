@@ -85,7 +85,7 @@ def main():
         if images:
             protector = ImageProtector(config, full_protection=args.full_image_protection)
             for img_path in images:
-                if process_image(img_path, output_path, protector, False):
+                if process_image(img_path, output_path, protector, False, base_path):
                     stats['images_processed'] += 1
             print(f"  Protected {stats['images_processed']} images")
         else:

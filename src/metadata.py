@@ -21,9 +21,13 @@ except ImportError:
 class MetadataStripper:
     """Strip metadata from images and other files."""
 
+    def __init__(self):
+        self._base_path: Optional[Path] = None
+
     def process_directory(self, base_path: Path, output_path: Optional[Path], excludes: list[str]) -> int:
         """Process all files in directory."""
         count = 0
+        self._base_path = base_path
 
         # Process images
         for pattern in ['**/*.jpg', '**/*.jpeg', '**/*.png', '**/*.webp', '**/*.tiff']:
@@ -51,9 +55,13 @@ class MetadataStripper:
         return False
 
     def _get_output_path(self, file_path: Path, output_path: Optional[Path]) -> Path:
-        """Get the output path for a file."""
+        """Get the output path for a file, preserving directory structure."""
         if output_path:
-            return output_path / file_path.name
+            if self._base_path:
+                relative = file_path.relative_to(self._base_path)
+            else:
+                relative = Path(file_path.name)
+            return output_path / relative
         return file_path
 
     def _strip_image_metadata(self, file_path: Path, output_path: Optional[Path]) -> bool:
@@ -68,7 +76,7 @@ class MetadataStripper:
 
             out_file = self._get_output_path(file_path, output_path)
             if output_path:
-                output_path.mkdir(parents=True, exist_ok=True)
+                out_file.parent.mkdir(parents=True, exist_ok=True)
 
             # Save with appropriate format
             ext = file_path.suffix.lower()
@@ -109,7 +117,7 @@ class MetadataStripper:
 
             out_file = self._get_output_path(file_path, output_path)
             if output_path:
-                output_path.mkdir(parents=True, exist_ok=True)
+                out_file.parent.mkdir(parents=True, exist_ok=True)
             out_file.write_text(str(soup), encoding='utf-8')
             return True
 

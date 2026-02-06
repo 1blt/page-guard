@@ -60,10 +60,12 @@ class Obfuscator:
         """
         self.minify = minify
         self.obfuscate = obfuscate
+        self._base_path: Optional[Path] = None
 
     def process_directory(self, base_path: Path, output_path: Optional[Path], excludes: list[str]) -> int:
         """Process all HTML, CSS, and JS files in directory."""
         count = 0
+        self._base_path = base_path
 
         for pattern in ['**/*.html', '**/*.htm']:
             for file_path in base_path.glob(pattern):
@@ -94,9 +96,13 @@ class Obfuscator:
         return False
 
     def _get_output_path(self, file_path: Path, output_path: Optional[Path]) -> Path:
-        """Get the output path for a file."""
+        """Get the output path for a file, preserving directory structure."""
         if output_path:
-            return output_path / file_path.name
+            if self._base_path:
+                relative = file_path.relative_to(self._base_path)
+            else:
+                relative = Path(file_path.name)
+            return output_path / relative
         return file_path
 
     def _process_html(self, file_path: Path, output_path: Optional[Path]) -> bool:
@@ -123,7 +129,7 @@ class Obfuscator:
 
             out_file = self._get_output_path(file_path, output_path)
             if output_path:
-                output_path.mkdir(parents=True, exist_ok=True)
+                out_file.parent.mkdir(parents=True, exist_ok=True)
             out_file.write_text(result, encoding='utf-8')
             return True
 
@@ -148,7 +154,7 @@ class Obfuscator:
 
             out_file = self._get_output_path(file_path, output_path)
             if output_path:
-                output_path.mkdir(parents=True, exist_ok=True)
+                out_file.parent.mkdir(parents=True, exist_ok=True)
             out_file.write_text(content, encoding='utf-8')
             return True
 
@@ -168,7 +174,7 @@ class Obfuscator:
 
             out_file = self._get_output_path(file_path, output_path)
             if output_path:
-                output_path.mkdir(parents=True, exist_ok=True)
+                out_file.parent.mkdir(parents=True, exist_ok=True)
             out_file.write_text(content, encoding='utf-8')
             return True
 
