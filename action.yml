@@ -86,8 +86,7 @@ runs:
       with:
         python-version: '3.11'
         cache: 'pip'
-        cache-dependency-path: |
-          ${{ github.action_path }}/requirements${{ inputs.full-image-protection == 'true' && '-full' || '' }}.txt
+        cache-dependency-path: '**/requirements*.txt'
 
     - name: Install dependencies
       shell: bash
