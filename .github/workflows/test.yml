@@ -1,0 +1,173 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-all-protections:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Page Guard (all protections)
+        id: guard
+        uses: ./
+        with:
+          path: './test/site'
+
+      - name: Verify outputs
+        run: |
+          echo "Images processed: ${{ steps.guard.outputs.images-processed }}"
+          echo "Files obfuscated: ${{ steps.guard.outputs.files-obfuscated }}"
+          echo "Metadata stripped: ${{ steps.guard.outputs.metadata-stripped }}"
+          echo "Decoys injected: ${{ steps.guard.outputs.decoys-injected }}"
+
+      - name: Verify obfuscation worked
+        run: |
+          # Check that class names were obfuscated
+          if grep -q 'class="hero-section"' test/site/index.html; then
+            echo "Error: Class names were not obfuscated"
+            exit 1
+          fi
+          echo "Class names obfuscated successfully"
+
+      - name: Verify poison data injected
+        run: |
+          # Check for aria-hidden decoy content
+          if ! grep -q 'aria-hidden="true"' test/site/index.html; then
+            echo "Error: Poison data was not injected"
+            exit 1
+          fi
+          echo "Poison data injected successfully"
+
+      - name: Verify metadata stripped
+        run: |
+          # Check that generator meta tag was removed
+          if grep -q 'name="generator"' test/site/index.html; then
+            echo "Error: Metadata was not stripped"
+            exit 1
+          fi
+          echo "Metadata stripped successfully"
+
+  test-image-only:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Page Guard (images only)
+        id: guard
+        uses: ./
+        with:
+          path: './test/site'
+          obfuscate: 'false'
+          minify: 'false'
+          strip-metadata: 'false'
+          anti-scrape: 'false'
+          poison-data: 'false'
+
+      - name: Verify only images processed
+        run: |
+          echo "Images processed: ${{ steps.guard.outputs.images-processed }}"
+
+          if [ "${{ steps.guard.outputs.images-processed }}" -lt 1 ]; then
+            echo "Error: No images were processed"
+            exit 1
+          fi
+
+          # Classes should NOT be obfuscated
+          if ! grep -q 'class="hero-section"' test/site/index.html; then
+            echo "Error: Classes were unexpectedly obfuscated"
+            exit 1
+          fi
+          echo "Image-only mode verified"
+
+  test-obfuscation-only:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Page Guard (obfuscation only)
+        id: guard
+        uses: ./
+        with:
+          path: './test/site'
+          protect-images: 'false'
+          strip-metadata: 'false'
+          anti-scrape: 'false'
+          poison-data: 'false'
+
+      - name: Verify obfuscation
+        run: |
+          echo "Files obfuscated: ${{ steps.guard.outputs.files-obfuscated }}"
+
+          if [ "${{ steps.guard.outputs.files-obfuscated }}" -lt 1 ]; then
+            echo "Error: No files were obfuscated"
+            exit 1
+          fi
+
+          # Check CSS was minified
+          if grep -q '/\*' test/site/styles.css; then
+            echo "Error: CSS comments were not removed"
+            exit 1
+          fi
+          echo "Obfuscation-only mode verified"
+
+  test-full-image-protection:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Page Guard (full image protection)
+        id: guard
+        uses: ./
+        with:
+          path: './test/site'
+          full-image-protection: 'true'
+          obfuscate: 'false'
+          minify: 'false'
+          strip-metadata: 'false'
+          anti-scrape: 'false'
+          poison-data: 'false'
+
+      - name: Verify full protection
+        run: |
+          echo "Images processed: ${{ steps.guard.outputs.images-processed }}"
+
+          if [ "${{ steps.guard.outputs.images-processed }}" -lt 1 ]; then
+            echo "Error: No images were processed with full protection"
+            exit 1
+          fi
+          echo "Full image protection verified"
+
+  test-output-path:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Page Guard (separate output)
+        id: guard
+        uses: ./
+        with:
+          path: './test/site'
+          output-path: './protected'
+
+      - name: Verify output directory
+        run: |
+          if [ ! -d "./protected" ]; then
+            echo "Error: Output directory was not created"
+            exit 1
+          fi
+
+          if [ ! -f "./protected/index.html" ]; then
+            echo "Error: HTML not in output directory"
+            exit 1
+          fi
+          echo "Output path mode verified"

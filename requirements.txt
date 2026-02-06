@@ -1,0 +1,16 @@
+# Image protection
+numpy>=1.24.0
+opencv-python-headless>=4.8.0
+Pillow>=10.0.0
+scipy>=1.11.0
+PyWavelets>=1.4.0
+
+# HTML/CSS/JS processing
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+cssutils>=2.9.0
+htmlmin>=0.1.12
+jsmin>=3.0.1
+
+# Metadata
+piexif>=1.1.3

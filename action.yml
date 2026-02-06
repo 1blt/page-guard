@@ -1,0 +1,117 @@
+name: 'Page Guard'
+description: 'Protect your site from AI scraping: obfuscate code, strip metadata, poison scrapers'
+author: '1blt'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  path:
+    description: 'Path to site directory'
+    required: false
+    default: '.'
+  output-path:
+    description: 'Output directory (defaults to in-place modification)'
+    required: false
+    default: ''
+  exclude:
+    description: 'Glob patterns to exclude (comma-separated)'
+    required: false
+    default: 'node_modules/**,vendor/**,.git/**'
+
+  # Image protection
+  protect-images:
+    description: 'Enable image protection (adversarial perturbations)'
+    required: false
+    default: 'true'
+  image-strength:
+    description: 'Image protection strength: subtle, balanced, or maximum'
+    required: false
+    default: 'balanced'
+  image-formats:
+    description: 'Image formats to process (comma-separated)'
+    required: false
+    default: 'png,jpg,jpeg,webp'
+  full-image-protection:
+    description: 'Enable neural network adversarial perturbations (slower)'
+    required: false
+    default: 'false'
+
+  # Obfuscation
+  obfuscate:
+    description: 'Enable HTML/CSS/JS obfuscation'
+    required: false
+    default: 'true'
+  minify:
+    description: 'Minify HTML/CSS/JS'
+    required: false
+    default: 'true'
+
+  # Metadata
+  strip-metadata:
+    description: 'Remove EXIF, comments, and other metadata'
+    required: false
+    default: 'true'
+
+  # Anti-scraping
+  anti-scrape:
+    description: 'Enable anti-scraping measures (honeypots, decoys)'
+    required: false
+    default: 'true'
+  poison-data:
+    description: 'Inject incorrect-but-readable decoy content for scrapers'
+    required: false
+    default: 'true'
+
+outputs:
+  images-processed:
+    description: 'Number of images processed'
+    value: ${{ steps.guard.outputs.images_processed }}
+  files-obfuscated:
+    description: 'Number of files obfuscated'
+    value: ${{ steps.guard.outputs.files_obfuscated }}
+  metadata-stripped:
+    description: 'Number of files with metadata stripped'
+    value: ${{ steps.guard.outputs.metadata_stripped }}
+  decoys-injected:
+    description: 'Number of decoy elements injected'
+    value: ${{ steps.guard.outputs.decoys_injected }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+        cache-dependency-path: |
+          ${{ github.action_path }}/requirements${{ inputs.full-image-protection == 'true' && '-full' || '' }}.txt
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        if [ "${{ inputs.full-image-protection }}" = "true" ]; then
+          pip install -r ${{ github.action_path }}/requirements-full.txt --extra-index-url https://download.pytorch.org/whl/cpu
+        else
+          pip install -r ${{ github.action_path }}/requirements.txt
+        fi
+
+    - name: Run Page Guard
+      id: guard
+      shell: bash
+      run: |
+        python ${{ github.action_path }}/src/guard.py \
+          --path "${{ inputs.path }}" \
+          --output-path "${{ inputs.output-path }}" \
+          --exclude "${{ inputs.exclude }}" \
+          ${{ inputs.protect-images == 'true' && '--protect-images' || '' }} \
+          --image-strength "${{ inputs.image-strength }}" \
+          --image-formats "${{ inputs.image-formats }}" \
+          ${{ inputs.full-image-protection == 'true' && '--full-image-protection' || '' }} \
+          ${{ inputs.obfuscate == 'true' && '--obfuscate' || '' }} \
+          ${{ inputs.minify == 'true' && '--minify' || '' }} \
+          ${{ inputs.strip-metadata == 'true' && '--strip-metadata' || '' }} \
+          ${{ inputs.anti-scrape == 'true' && '--anti-scrape' || '' }} \
+          ${{ inputs.poison-data == 'true' && '--poison-data' || '' }}

@@ -1,0 +1,28 @@
+/* Test stylesheet */
+.hero-section {
+    background: #f0f0f0;
+    padding: 20px;
+}
+
+.title {
+    font-size: 2em;
+    color: #333;
+}
+
+.description {
+    color: #666;
+}
+
+#main-content {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.sidebar {
+    width: 200px;
+    float: left;
+}
+
+#nav a {
+    text-decoration: none;
+}
