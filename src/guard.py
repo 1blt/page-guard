@@ -127,51 +127,38 @@ def main():
     print("\n" + "=" * 50)
     print("Complete!")
 
+    def status_label(enabled):
+        return "Enabled" if enabled else "Disabled"
+
+    total = sum(stats.values())
+
+    # Write to GITHUB_OUTPUT for action outputs
     github_output = os.environ.get('GITHUB_OUTPUT')
     if github_output:
         with open(github_output, 'a') as f:
             for key, value in stats.items():
                 f.write(f"{key}={value}\n")
-    else:
-        for key, value in stats.items():
-            print(f"::set-output name={key}::{value}")
 
-    # Generate GitHub Actions summary table
+    # Generate summary (GitHub Actions or console)
     github_summary = os.environ.get('GITHUB_STEP_SUMMARY')
     if github_summary:
         with open(github_summary, 'a') as f:
             f.write("## Page Guard Summary\n\n")
-
-            # Protection status table
-            f.write("### Protection Status\n\n")
             f.write("| Protection | Status | Count |\n")
             f.write("|------------|--------|-------|\n")
-
-            def status_cell(enabled):
-                return "Enabled" if enabled else "Disabled"
-
-            f.write(f"| Image Protection | {status_cell(protections['images'])} | {stats['images_processed']} images |\n")
-            f.write(f"| Obfuscation | {status_cell(protections['obfuscation'])} | {stats['files_obfuscated']} files |\n")
-            f.write(f"| Metadata Stripping | {status_cell(protections['metadata'])} | {stats['metadata_stripped']} files |\n")
-            f.write(f"| Anti-Scraping | {status_cell(protections['anti_scrape'])} | {stats['decoys_injected']} decoys |\n")
-            f.write("\n")
-
-            # Configuration details
-            f.write("### Configuration\n\n")
-            f.write(f"- **Path:** `{base_path}`\n")
-            if output_path:
-                f.write(f"- **Output:** `{output_path}`\n")
-            else:
-                f.write("- **Output:** In-place modification\n")
-            if protections['images']:
-                f.write(f"- **Image Strength:** {args.image_strength}\n")
-                if args.full_image_protection:
-                    f.write("- **Full Image Protection:** Enabled (neural network perturbations)\n")
-            f.write("\n")
-
-            # Total changes
-            total = sum(stats.values())
-            f.write(f"**Total changes:** {total}\n")
+            f.write(f"| Image Protection | {status_label(protections['images'])} | {stats['images_processed']} images |\n")
+            f.write(f"| Obfuscation | {status_label(protections['obfuscation'])} | {stats['files_obfuscated']} files |\n")
+            f.write(f"| Metadata Stripping | {status_label(protections['metadata'])} | {stats['metadata_stripped']} files |\n")
+            f.write(f"| Anti-Scraping | {status_label(protections['anti_scrape'])} | {stats['decoys_injected']} decoys |\n")
+            f.write(f"\n**Total changes:** {total}\n")
+    else:
+        # Console summary for local runs
+        print(f"\nSummary:")
+        print(f"  Images processed: {stats['images_processed']}")
+        print(f"  Files obfuscated: {stats['files_obfuscated']}")
+        print(f"  Metadata stripped: {stats['metadata_stripped']}")
+        print(f"  Decoys injected: {stats['decoys_injected']}")
+        print(f"  Total: {total}")
 
     return 0
 
