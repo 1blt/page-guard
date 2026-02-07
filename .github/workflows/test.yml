@@ -13,10 +13,17 @@ jobs:
       images: ${{ steps.guard.outputs.images-processed }}
       obfuscated: ${{ steps.guard.outputs.files-obfuscated }}
       metadata: ${{ steps.guard.outputs.metadata-stripped }}
+      chars: ${{ steps.guard.outputs.chars-transformed }}
+      zerowidth: ${{ steps.guard.outputs.zero-width-inserted }}
       decoys: ${{ steps.guard.outputs.decoys-injected }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Save original image checksums
+        run: |
+          md5sum test/site/*.png test/site/*.jpg > /tmp/original-checksums.txt
+          cat /tmp/original-checksums.txt
 
       - name: Run Page Guard
         id: guard
@@ -45,6 +52,73 @@ jobs:
             echo "Error: Metadata was not stripped"
             exit 1
           fi
+
+      - name: Verify text guard (zero-width)
+        run: |
+          # Check for zero-width characters (U+200B, U+200C, U+200D, U+FEFF)
+          if ! grep -P '[\x{200B}\x{200C}\x{200D}\x{FEFF}]' test/site/index.html; then
+            echo "Error: Zero-width characters were not inserted"
+            exit 1
+          fi
+
+      - name: Verify text guard (homoglyphs)
+        run: |
+          # Check for Cyrillic lookalikes (а, е, о, с, р - common replacements)
+          if ! grep -P '[\x{0430}\x{0435}\x{043e}\x{0441}\x{0440}]' test/site/index.html; then
+            echo "Error: Homoglyph characters were not substituted"
+            exit 1
+          fi
+
+      - name: Verify honeypot links injected
+        run: |
+          # Check for honeypot link paths
+          if ! grep -qE 'href="/(admin|wp-admin|api|\.env|config|secret)' test/site/index.html; then
+            echo "Error: Honeypot links were not injected"
+            exit 1
+          fi
+
+      - name: Verify CSS minification
+        run: |
+          # Check that CSS comments were removed
+          if grep -q '/\*' test/site/styles.css; then
+            echo "Error: CSS comments were not removed"
+            exit 1
+          fi
+
+      - name: Verify JS minification
+        run: |
+          # Check that JS comments were removed
+          if grep -q '//' test/site/app.js; then
+            echo "Error: JS comments were not removed"
+            exit 1
+          fi
+
+      - name: Verify images were modified
+        run: |
+          md5sum test/site/*.png test/site/*.jpg > /tmp/new-checksums.txt
+          cat /tmp/new-checksums.txt
+          # Compare checksums - they should be different
+          if diff -q /tmp/original-checksums.txt /tmp/new-checksums.txt > /dev/null 2>&1; then
+            echo "Error: Images were not modified"
+            exit 1
+          fi
+          echo "Images were modified successfully"
+
+      - name: Verify EXIF data stripped
+        run: |
+          pip install pillow
+          python3 << 'EOF'
+          from PIL import Image
+          import sys
+
+          # Check JPG for EXIF (PNG typically doesn't have EXIF)
+          img = Image.open('test/site/pattern.jpg')
+          exif = img._getexif()
+          if exif:
+              print(f"Error: EXIF data still present: {list(exif.keys())}")
+              sys.exit(1)
+          print("EXIF data successfully stripped")
+          EOF
 
   test-full-image-protection:
     runs-on: ubuntu-latest
@@ -114,6 +188,7 @@ jobs:
           echo "| 1 | Metadata Stripping | ${{ needs.test-all-protections.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.metadata }} files | Stripped EXIF data, generator tags, and sensitive metadata |" >> $GITHUB_STEP_SUMMARY
           echo "| 2 | Image Protection | ${{ needs.test-all-protections.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.images }} images | Applied adversarial perturbations (DCT, wavelet, strategic noise) |" >> $GITHUB_STEP_SUMMARY
           echo "| 3 | Obfuscation | ${{ needs.test-all-protections.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.obfuscated }} files | Removed comments and minified HTML, CSS, and JavaScript |" >> $GITHUB_STEP_SUMMARY
-          echo "| 4 | Anti-Scraping | ${{ needs.test-all-protections.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.decoys }} decoys | Injected honeypot links and poison data |" >> $GITHUB_STEP_SUMMARY
-          echo "| 5 | Neural Network | ${{ needs.test-full-image-protection.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-full-image-protection.outputs.images }} images | ResNet50-based adversarial perturbations |" >> $GITHUB_STEP_SUMMARY
-          echo "| 6 | Output Directory | ${{ needs.test-output-path.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-output-path.outputs.images }} files | Protected files written to separate directory |" >> $GITHUB_STEP_SUMMARY
+          echo "| 4 | Text Guard | ${{ needs.test-all-protections.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.chars }} chars, ${{ needs.test-all-protections.outputs.zerowidth }} zero-width | Homoglyph substitution and zero-width character insertion |" >> $GITHUB_STEP_SUMMARY
+          echo "| 5 | Anti-Scraping | ${{ needs.test-all-protections.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-all-protections.outputs.decoys }} decoys | Injected honeypot links and poison data |" >> $GITHUB_STEP_SUMMARY
+          echo "| 6 | Neural Network | ${{ needs.test-full-image-protection.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-full-image-protection.outputs.images }} images | ResNet50-based adversarial perturbations |" >> $GITHUB_STEP_SUMMARY
+          echo "| 7 | Output Directory | ${{ needs.test-output-path.result == 'success' && '**Pass**' || 'Failed' }} | ${{ needs.test-output-path.outputs.images }} files | Protected files written to separate directory |" >> $GITHUB_STEP_SUMMARY

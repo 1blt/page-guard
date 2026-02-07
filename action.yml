@@ -63,6 +63,29 @@ inputs:
     description: 'Inject incorrect-but-readable decoy content for scrapers'
     required: false
     default: 'true'
+
+  # Text Guard
+  text-guard:
+    description: 'Enable text transformation to prevent copy/search (homoglyphs + zero-width)'
+    required: false
+    default: 'true'
+  homoglyphs:
+    description: 'Replace characters with visually identical Unicode lookalikes'
+    required: false
+    default: 'true'
+  zero-width:
+    description: 'Insert invisible zero-width characters between letters'
+    required: false
+    default: 'true'
+  homoglyph-ratio:
+    description: 'Fraction of eligible characters to replace (0.0-1.0)'
+    required: false
+    default: '0.3'
+  zero-width-ratio:
+    description: 'Fraction of character gaps to fill with zero-width chars (0.0-1.0)'
+    required: false
+    default: '0.2'
+
   generate-summary:
     description: 'Generate GitHub Actions step summary'
     required: false
@@ -78,6 +101,12 @@ outputs:
   metadata-stripped:
     description: 'Number of files with metadata stripped'
     value: ${{ steps.guard.outputs.metadata_stripped }}
+  chars-transformed:
+    description: 'Number of characters transformed by homoglyphs'
+    value: ${{ steps.guard.outputs.chars_transformed }}
+  zero-width-inserted:
+    description: 'Number of zero-width characters inserted'
+    value: ${{ steps.guard.outputs.zero_width_inserted }}
   decoys-injected:
     description: 'Number of decoy elements injected'
     value: ${{ steps.guard.outputs.decoys_injected }}
@@ -118,4 +147,9 @@ runs:
           ${{ inputs.strip-metadata == 'true' && '--strip-metadata' || '' }} \
           ${{ inputs.anti-scrape == 'true' && '--anti-scrape' || '' }} \
           ${{ inputs.poison-data == 'true' && '--poison-data' || '' }} \
+          ${{ inputs.text-guard == 'true' && '--text-guard' || '' }} \
+          ${{ inputs.homoglyphs == 'true' && '--homoglyphs' || '' }} \
+          ${{ inputs.zero-width == 'true' && '--zero-width' || '' }} \
+          --homoglyph-ratio "${{ inputs.homoglyph-ratio }}" \
+          --zero-width-ratio "${{ inputs.zero-width-ratio }}" \
           ${{ inputs.generate-summary == 'false' && '--no-summary' || '' }}

@@ -19,8 +19,9 @@ That's it. All protections are enabled by default.
 | Protection | What It Does | Default |
 |------------|--------------|---------|
 | **Image Protection** | Adversarial perturbations that confuse AI models | On |
-| **Obfuscation** | Minify + obfuscate HTML, CSS, JS class/ID names | On |
+| **Obfuscation** | Minify + strip comments from HTML, CSS, JS | On |
 | **Metadata Stripping** | Remove EXIF, comments, generator tags | On |
+| **Text Guard** | Replace chars with lookalikes + insert zero-width chars | On |
 | **Anti-Scraping** | Honeypot links + poison data invisible to humans | On |
 
 ### Poison Data
@@ -36,6 +37,24 @@ Hidden content that scrapers pick up but humans never see:
 ```
 
 This pollutes AI training data with plausible-but-wrong information.
+
+### Text Guard
+
+Transforms visible text to break copy/paste and text search while looking identical:
+
+```html
+<!-- Original -->
+<p>Hello World</p>
+
+<!-- After Text Guard -->
+<p>Ηello Wοrld</p>  <!-- 'H' → Cyrillic 'Η', 'o' → Cyrillic 'ο' -->
+```
+
+**Homoglyphs**: Replace Latin characters with visually identical Unicode lookalikes (Cyrillic, Greek). Text looks the same but won't match searches.
+
+**Zero-width characters**: Insert invisible characters (`U+200B`, `U+200C`, `U+200D`) between letters. Breaks text matching without visual change.
+
+Safe elements are automatically skipped: `<script>`, `<style>`, `<code>`, `<pre>`, `<textarea>`, and elements with `data-no-transform` attribute.
 
 ## Usage
 
@@ -89,6 +108,13 @@ jobs:
     # Anti-scraping
     anti-scrape: 'true'          # Honeypot links
     poison-data: 'true'          # Inject fake content
+
+    # Text Guard
+    text-guard: 'true'           # Enable both homoglyphs + zero-width
+    homoglyphs: 'true'           # Replace chars with lookalikes
+    zero-width: 'true'           # Insert invisible chars
+    homoglyph-ratio: '0.3'       # Fraction of chars to replace (0.0-1.0)
+    zero-width-ratio: '0.2'      # Fraction of gaps to fill (0.0-1.0)
 ```
 
 ### Selective Protection
@@ -126,6 +152,8 @@ Only enable what you need:
     echo "Images protected: ${{ steps.guard.outputs.images-processed }}"
     echo "Files obfuscated: ${{ steps.guard.outputs.files-obfuscated }}"
     echo "Metadata stripped: ${{ steps.guard.outputs.metadata-stripped }}"
+    echo "Chars transformed: ${{ steps.guard.outputs.chars-transformed }}"
+    echo "Zero-width inserted: ${{ steps.guard.outputs.zero-width-inserted }}"
     echo "Decoys injected: ${{ steps.guard.outputs.decoys-injected }}"
 ```
 
@@ -142,19 +170,9 @@ Applies multiple layers of perturbation:
 
 ### Obfuscation
 
-- Renames CSS classes and IDs to random strings
-- Updates all references in HTML, CSS, and JS
-- Minifies output (removes whitespace, comments)
-
-Before:
-```html
-<div class="hero-section" id="main-content">
-```
-
-After:
-```html
-<div class="cxkwj" id="iqmvf">
-```
+- Removes HTML, CSS, and JavaScript comments
+- Minifies whitespace in all files
+- Preserves class/ID names (safe for React, Vue, lit-html)
 
 ### Metadata Stripping
 
@@ -162,6 +180,20 @@ After:
 - Strips HTML comments
 - Removes generator/author meta tags
 - Cleans sensitive data-* attributes
+
+### Text Guard
+
+Breaks text copy/paste and search while maintaining visual appearance:
+
+**Homoglyphs**: Replaces characters with Unicode lookalikes
+- `a` → `а` (Cyrillic), `e` → `е` (Cyrillic), `o` → `о` (Cyrillic)
+- Text appears identical but won't match when searched or copied
+
+**Zero-width characters**: Inserts invisible characters between letters
+- `U+200B` (zero-width space), `U+200C` (zero-width non-joiner), `U+200D` (zero-width joiner)
+- Breaks word boundaries for text matching
+
+Automatically skips: `<script>`, `<style>`, `<code>`, `<pre>`, `<textarea>`, and `data-no-transform` elements.
 
 ### Anti-Scraping
 
@@ -187,7 +219,8 @@ python src/guard.py \
   --minify \
   --strip-metadata \
   --anti-scrape \
-  --poison-data
+  --poison-data \
+  --text-guard           # or use --homoglyphs / --zero-width separately
 ```
 
 ## Limitations
